@@ -7,25 +7,28 @@ import io.github.jessedeoliveira.playlistorg.model.SortingJob;
 import io.github.jessedeoliveira.playlistorg.model.Track;
 import io.github.jessedeoliveira.playlistorg.model.TrackStatus;
 import io.github.jessedeoliveira.playlistorg.repository.SortingJobRepository;
+import io.github.jessedeoliveira.playlistorg.repository.TrackRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
 
-@Service
-@RequiredArgsConstructor
-public class WebhookIngestionService {
+    @Service
+    @RequiredArgsConstructor
+    public class WebhookIngestionService {
 
-    private final SortingJobRepository sortingJobRepository;
+        private final SortingJobRepository sortingJobRepository;
+        private final TrackRepository trackRepository;
+        private final HeuristicEngineService heuristicEngineService;
 
-    @Transactional
-    public void processPlaylistWebhook(WebhookPayloadDTO payload) {
+        @Transactional
+        public void processPlaylistWebhook(WebhookPayloadDTO payload) {
 
-        // 1. Convert the String ID back to a UUID and find the pending job
-        UUID jobId = UUID.fromString(payload.getJobId());
-        SortingJob job = sortingJobRepository.findById(jobId)
-                .orElseThrow(() -> new IllegalArgumentException("Sorting Job not found: " + jobId));
+            // 1. Convert the String ID back to a UUID and find the pending job
+            UUID jobId = UUID.fromString(payload.getJobId());
+            SortingJob job = sortingJobRepository.findById(jobId)
+                    .orElseThrow(() -> new IllegalArgumentException("Sorting Job not found: " + jobId));
 
         // 2. Handle failure states gracefully
         if (!"FETCH_SUCCESS".equals(payload.getStatus())) {
@@ -51,5 +54,6 @@ public class WebhookIngestionService {
         job.setStatus(JobStatus.PROCESSING);
 
         sortingJobRepository.save(job);
+        heuristicEngineService.processPendingTracks(jobId);
     }
 }
